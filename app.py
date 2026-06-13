@@ -67,7 +67,7 @@ st.title("📚 Multi-Source English News Reader (Fixed)")
 st.sidebar.header("📰 Sources")
 
 sources = {
-    "NYTimes World": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+    "NYTimes World (Broken)": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
     "BBC World": "http://feeds.bbci.co.uk/news/world/rss.xml",
     "CNN Top Stories": "http://rss.cnn.com/rss/edition.rss",
     "Reuters World": "https://www.reutersagency.com/feed/?best-topics=world",
@@ -137,7 +137,7 @@ if "all_articles" in st.session_state:
             st.text_area(
                 "📄 Article Content",
                 text,
-                height=500,
+                height=600,
                 key=f"text_{i}"
             )
 
