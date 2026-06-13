@@ -3,7 +3,6 @@ import feedparser
 import trafilatura
 import requests
 import re
-from collections import Counter
 from bs4 import BeautifulSoup
 
 
@@ -12,6 +11,9 @@ from bs4 import BeautifulSoup
 # =========================
 if "selected_article" not in st.session_state:
     st.session_state.selected_article = None
+
+if "selected_word" not in st.session_state:
+    st.session_state.selected_word = ""
 
 
 # =========================
@@ -32,7 +34,7 @@ def get_articles_from_rss(rss_url, source_name, limit=5):
 
 
 # =========================
-# EXTRACT ARTICLE TEXT
+# ARTICLE EXTRACTION
 # =========================
 def extract_clean_text(url):
     try:
@@ -54,34 +56,17 @@ def extract_clean_text(url):
 
 
 # =========================
-# KEY WORDS (FOR HIGHLIGHTING)
+# SIMPLE CLEANING
 # =========================
-def extract_keywords(text, top_n=12):
-    words = re.findall(r"[a-zA-Z']+", text.lower())
-    words = [w for w in words if len(w) > 4]
-
-    freq = Counter(words)
-    return [w for w, _ in freq.most_common(top_n)]
-
-
-# =========================
-# HIGHLIGHT FUNCTION
-# =========================
-def highlight_text(text, keywords):
-    def replacer(match):
-        word = match.group(0)
-        if word.lower() in keywords:
-            return f"<mark style='background-color:#ffd54f;padding:2px;border-radius:4px'>{word}</mark>"
-        return word
-
-    pattern = re.compile(r"[a-zA-Z']+")
-    return pattern.sub(replacer, text)
+def clean_text(text):
+    lines = text.split("\n")
+    return "\n".join([l for l in lines if len(l.strip()) > 2])
 
 
 # =========================
 # UI
 # =========================
-st.title("📚 English News Reader (Highlight Mode)")
+st.title("📚 English News Reader (Word Selection Mode)")
 
 sources = {
     "BBC": "http://feeds.bbci.co.uk/news/world/rss.xml",
@@ -141,11 +126,9 @@ if "articles" in st.session_state:
         if st.session_state.selected_article == a["link"]:
 
             raw_text = extract_clean_text(a["link"])
+            text = clean_text(raw_text)
 
-            # extract keywords for highlighting
-            keywords = extract_keywords(raw_text)
-
-            highlighted = highlight_text(raw_text, keywords)
+            st.subheader("📄 Article")
 
             font_size = st.slider("📖 Text size", 14, 26, 18, key=f"font_{i}")
 
@@ -160,8 +143,43 @@ if "articles" in st.session_state:
                     color:#f5f5f5;
                     white-space:pre-wrap;
                 ">
-                {highlighted}
+                {text}
                 </div>
                 """,
                 unsafe_allow_html=True
             )
+
+            # =========================
+            # WORD SELECTION FEATURE
+            # =========================
+            st.subheader("🖱️ Word Selection Mode")
+
+            st.write("Click inside the box below, then copy/paste or select a word.")
+
+            selected = st.text_input("Enter or paste a word to analyze")
+
+            if selected:
+                st.session_state.selected_word = selected.lower()
+
+            # Show result
+            if st.session_state.selected_word:
+                word = st.session_state.selected_word
+
+                st.info(f"Selected word: **{word}**")
+
+                # simple explanation fallback
+                st.write("📘 Basic meaning (placeholder):")
+                st.write(f"'{word}' is a vocabulary word from the article.")
+
+                # optional: quick Google-style definition API (lightweight)
+                if st.button("🔎 Search definition"):
+                    try:
+                        res = requests.get(
+                            f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}"
+                        ).json()
+
+                        meaning = res[0]["meanings"][0]["definitions"][0]["definition"]
+                        st.success(meaning)
+
+                    except:
+                        st.warning("Definition not found.")
