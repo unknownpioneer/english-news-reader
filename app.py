@@ -134,11 +134,23 @@ if "all_articles" in st.session_state:
             with st.spinner("Extracting article..."):
                 text = extract_clean_text(article["link"])
 
-            st.text_area(
-                "📄 Article Content",
-                text,
-                height=600,
-                key=f"text_{i}"
-            )
+font_size = st.slider("📖 Text size", 14, 26, 18)
+
+st.markdown(
+    f"""
+    <div style="
+        font-size:{font_size}px;
+        line-height:1.8;
+        padding:16px;
+        background-color:#1e1e1e;
+        border-radius:12px;
+        color:#f5f5f5;
+        white-space:pre-wrap;
+    ">
+    {text}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
         st.divider()
