@@ -93,7 +93,7 @@ sources = {
     {
         "url": "https://www.theguardian.com/world/rss"
         "default": True
-    ),
+    },
     "🇦🇺Inside Story (Australia)": {
         "url": "https://insidestory.org.au/feed/",
         "default": True   # 👈 IMPORTANT: unchecked by default
