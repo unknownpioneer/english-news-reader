@@ -91,7 +91,7 @@ st.title("📚 Multi-Source English Reader (BBC + Inside Story)")
 sources = {
     "BBC News": "https://feeds.bbci.co.uk/news/rss.xml",
     "Inside Story (Australia)": "https://insidestory.org.au/feed/",
-    "Italian A1 News (LinguaWire)": "https://feeds.transistor.fm/learn-italian-a1-with-news-slow-easy-italiano-for-beginners"
+    "Republicca": ""https://www.repubblica.it/rss/homepage/rss2.0.xml""
 }
 
 selected_sources = []
