@@ -131,26 +131,24 @@ if "all_articles" in st.session_state:
 
         # If selected → show content
         if st.session_state.selected_article == article["link"]:
-            with st.spinner("Extracting article..."):
+           with st.spinner("Extracting article..."):
                 text = extract_clean_text(article["link"])
 
-font_size = st.slider("📖 Text size", 14, 26, 18)
+           font_size = st.slider("📖 Text size", 14, 26, 18, key=f"font_{i}")
 
-st.markdown(
-    f"""
-    <div style="
-        font-size:{font_size}px;
-        line-height:1.8;
-        padding:16px;
-        background-color:#1e1e1e;
-        border-radius:12px;
-        color:#f5f5f5;
-        white-space:pre-wrap;
-    ">
-    {text}
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-        st.divider()
+           st.markdown(
+               f"""
+               <div style="
+                    font-size:{font_size}px;
+                    line-height:1.8;
+                    padding:16px;
+                    background-color:#1e1e1e;
+                    border-radius:12px;
+                    color:#f5f5f5;
+                    white-space:pre-wrap;
+              ">
+              {text}
+              </div>
+              """,
+              unsafe_allow_html=True
+          )
