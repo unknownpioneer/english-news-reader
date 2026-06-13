@@ -1,0 +1,5 @@
+streamlit
+feedparser
+requests
+beautifulsoup4
+readability-lxml
