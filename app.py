@@ -2,6 +2,7 @@ import streamlit as st
 import feedparser
 import trafilatura
 import requests
+import re
 from bs4 import BeautifulSoup
 
 
@@ -67,10 +68,7 @@ st.title("📚 Multi-Source English News Reader (Fixed)")
 st.sidebar.header("📰 Sources")
 
 sources = {
-    "NYTimes World (Broken)": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
     "BBC World": "http://feeds.bbci.co.uk/news/world/rss.xml",
-    "CNN Top Stories": "http://rss.cnn.com/rss/edition.rss",
-    "Reuters World": "https://www.reutersagency.com/feed/?best-topics=world",
     "Inside Story": "https://insidestory.org.au/feed/"
 }
 
@@ -152,3 +150,31 @@ if "all_articles" in st.session_state:
               """,
               unsafe_allow_html=True
           )
+            
+def clean_article_text(text):
+    # split into lines
+    lines = text.split("\n")
+
+    cleaned_lines = []
+
+    for line in lines:
+        line_lower = line.lower()
+
+        # ❌ filter out metadata / noise
+        if (
+            "published" in line_lower or
+            "updated" in line_lower or
+            "ago" in line_lower or
+            "share" in line_lower or
+            "follow us" in line_lower or
+            "sign up" in line_lower
+        ):
+            continue
+
+        # remove empty junk
+        if len(line.strip()) < 3:
+            continue
+
+        cleaned_lines.append(line)
+
+    return "\n".join(cleaned_lines)
