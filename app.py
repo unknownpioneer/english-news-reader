@@ -73,7 +73,7 @@ sources = {
         "url": "https://www.theguardian.com/world/rss",
         "default": True
     },
-    "🇺🇸The NPR":{
+    "🇺🇸The National Public Radio":{
         "url": "https://feeds.npr.org/1001/rss.xml",
         "default": True
     },
