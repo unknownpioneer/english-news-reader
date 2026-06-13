@@ -70,8 +70,8 @@ st.title("📚 English News Reader (Word Selection Mode)")
 
 sources = {
     "BBC": "http://feeds.bbci.co.uk/news/world/rss.xml",
-    "NYTimes": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
-    "CNN": "http://rss.cnn.com/rss/edition.rss"
+    "Inside Story": "https://insidestory.org.au/feed/",
+    "LinguaWire A1": "https://feeds.transistor.fm/learn-italian-a1-with-news-slow-easy-italiano-for-beginners"
 }
 
 selected_sources = []
