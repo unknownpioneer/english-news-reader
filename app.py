@@ -3,6 +3,7 @@ import feedparser
 import trafilatura
 import requests
 import re
+import lxml
 from bs4 import BeautifulSoup
 
 
