@@ -91,7 +91,7 @@ sources = {
     },
     "🇬🇧The Guardian":
     {
-        "url": "https://www.theguardian.com/world/rss"
+        "url": "https://www.theguardian.com/world/rss",
         "default": True
     },
     "🇦🇺Inside Story (Australia)": {
@@ -99,7 +99,7 @@ sources = {
         "default": True   # 👈 IMPORTANT: unchecked by default
     },
     "🇮🇹Repubblica": {
-        "url": "https://www.repubblica.it/rss/homepage/rss2.0.xml"
+        "url": "https://www.repubblica.it/rss/homepage/rss2.0.xml",
         "default": False
     }
     
