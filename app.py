@@ -8,13 +8,10 @@ from bs4 import BeautifulSoup
 
 
 # =========================
-# SESSION STATE INIT
+# SESSION STATE
 # =========================
 if "selected_article" not in st.session_state:
     st.session_state.selected_article = None
-
-if "saved_words" not in st.session_state:
-    st.session_state.saved_words = set()
 
 
 # =========================
@@ -35,7 +32,7 @@ def get_articles_from_rss(rss_url, source_name, limit=5):
 
 
 # =========================
-# ARTICLE EXTRACTION
+# EXTRACT ARTICLE TEXT
 # =========================
 def extract_clean_text(url):
     try:
@@ -46,91 +43,50 @@ def extract_clean_text(url):
             if text and len(text) > 200:
                 return text
 
-        # fallback
         headers = {"User-Agent": "Mozilla/5.0"}
         html = requests.get(url, headers=headers, timeout=15).text
         soup = BeautifulSoup(html, "html.parser")
 
-        text = soup.get_text("\n")
-        return text
+        return soup.get_text("\n")
 
     except Exception as e:
         return f"⚠️ Error: {e}"
 
 
 # =========================
-# CLEAN TEXT
-# =========================
-def clean_text(text):
-    lines = text.split("\n")
-    cleaned = []
-
-    for line in lines:
-        l = line.lower()
-
-        if any(x in l for x in ["published", "updated", "ago", "subscribe", "share"]):
-            continue
-
-        if len(line.strip()) < 3:
-            continue
-
-        cleaned.append(line)
-
-    return "\n".join(cleaned)
-
-
-# =========================
-# KEY VOCABULARY
+# KEY WORDS (FOR HIGHLIGHTING)
 # =========================
 def extract_keywords(text, top_n=12):
     words = re.findall(r"[a-zA-Z']+", text.lower())
     words = [w for w in words if len(w) > 4]
 
     freq = Counter(words)
-    return freq.most_common(top_n)
+    return [w for w, _ in freq.most_common(top_n)]
 
 
 # =========================
-# TRANSLATION
+# HIGHLIGHT FUNCTION
 # =========================
-def translate_word(word):
-    try:
-        url = f"https://api.mymemory.translated.net/get?q={word}&langpair=en|zh"
-        res = requests.get(url).json()
-        return res["responseData"]["translatedText"]
-    except:
-        return "Translation error"
+def highlight_text(text, keywords):
+    def replacer(match):
+        word = match.group(0)
+        if word.lower() in keywords:
+            return f"<mark style='background-color:#ffd54f;padding:2px;border-radius:4px'>{word}</mark>"
+        return word
 
-
-# =========================
-# QUIZ GENERATOR
-# =========================
-def generate_quiz(text, n=3):
-    sentences = [s.strip() for s in text.split(".") if len(s.split()) > 8]
-
-    if len(sentences) == 0:
-        return []
-
-    import random
-    picks = random.sample(sentences, min(n, len(sentences)))
-
-    return [
-        {
-            "question": f"What does this mean?\n\n{p}?",
-            "answer": p
-        }
-        for p in picks
-    ]
+    pattern = re.compile(r"[a-zA-Z']+")
+    return pattern.sub(replacer, text)
 
 
 # =========================
 # UI
 # =========================
-st.title("📚 English News Learning App")
+st.title("📚 English News Reader (Highlight Mode)")
 
 sources = {
     "BBC": "http://feeds.bbci.co.uk/news/world/rss.xml",
-    "Inside Story": "https://insidestory.org.au/feed/"
+    "NYTimes": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+    "CNN": "http://rss.cnn.com/rss/edition.rss"
 }
 
 selected_sources = []
@@ -184,12 +140,14 @@ if "articles" in st.session_state:
         # =========================
         if st.session_state.selected_article == a["link"]:
 
-            raw = extract_clean_text(a["link"])
-            text = clean_text(raw)
+            raw_text = extract_clean_text(a["link"])
 
-            st.subheader("📄 Article")
+            # extract keywords for highlighting
+            keywords = extract_keywords(raw_text)
 
-            font_size = st.slider("Text size", 14, 26, 18, key=f"font_{i}")
+            highlighted = highlight_text(raw_text, keywords)
+
+            font_size = st.slider("📖 Text size", 14, 26, 18, key=f"font_{i}")
 
             st.markdown(
                 f"""
@@ -202,54 +160,8 @@ if "articles" in st.session_state:
                     color:#f5f5f5;
                     white-space:pre-wrap;
                 ">
-                {text}
+                {highlighted}
                 </div>
                 """,
                 unsafe_allow_html=True
             )
-
-            # =========================
-            # KEY VOCABULARY
-            # =========================
-            st.subheader("🔑 Key Vocabulary")
-
-            keywords = extract_keywords(text)
-
-            for word, freq in keywords:
-                col1, col2 = st.columns([3, 1])
-
-                with col1:
-                    st.write(f"{word} ({freq})")
-
-                with col2:
-                    if st.button("➕ Save", key=f"save_{word}_{i}"):
-                        st.session_state.saved_words.add(word)
-
-            # =========================
-            # SAVED WORDS
-            # =========================
-            st.subheader("💾 Saved Words")
-            st.write(list(st.session_state.saved_words))
-
-            # =========================
-            # TRANSLATION
-            # =========================
-            st.subheader("🌍 Translate Words")
-
-            for word, _ in keywords:
-                if st.button(f"{word}", key=f"tr_{word}_{i}"):
-                    translation = translate_word(word)
-                    st.info(f"{word} → {translation}")
-
-            # =========================
-            # QUIZ
-            # =========================
-            st.subheader("🧠 Quiz")
-
-            quiz = generate_quiz(text)
-
-            for j, q in enumerate(quiz):
-                st.write(q["question"])
-
-                if st.button(f"Show answer {j}", key=f"quiz_{i}_{j}"):
-                    st.success(q["answer"])
