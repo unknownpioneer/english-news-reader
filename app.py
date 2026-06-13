@@ -22,7 +22,33 @@ def get_articles_from_rss(rss_url, source_name, limit=5):
 
     return articles
 
+def clean_article_text(text):
+    # split into lines
+    lines = text.split("\n")
 
+    cleaned_lines = []
+
+    for line in lines:
+        line_lower = line.lower()
+
+        # ❌ filter out metadata / noise
+        if (
+            "published" in line_lower or
+            "updated" in line_lower or
+            "ago" in line_lower or
+            "share" in line_lower or
+            "follow us" in line_lower or
+            "sign up" in line_lower
+        ):
+            continue
+
+        # remove empty junk
+        if len(line.strip()) < 3:
+            continue
+
+        cleaned_lines.append(line)
+
+    return "\n".join(cleaned_lines)
 # =========================
 # TEXT EXTRACTION (ROBUST)
 # =========================
@@ -130,7 +156,8 @@ if "all_articles" in st.session_state:
         # If selected → show content
         if st.session_state.selected_article == article["link"]:
            with st.spinner("Extracting article..."):
-                text = extract_clean_text(article["link"])
+                raw_text = extract_clean_text(article["link"])
+                text = clean_article_text(raw_text)
 
            font_size = st.slider("📖 Text size", 14, 26, 18, key=f"font_{i}")
 
@@ -151,30 +178,3 @@ if "all_articles" in st.session_state:
               unsafe_allow_html=True
           )
             
-def clean_article_text(text):
-    # split into lines
-    lines = text.split("\n")
-
-    cleaned_lines = []
-
-    for line in lines:
-        line_lower = line.lower()
-
-        # ❌ filter out metadata / noise
-        if (
-            "published" in line_lower or
-            "updated" in line_lower or
-            "ago" in line_lower or
-            "share" in line_lower or
-            "follow us" in line_lower or
-            "sign up" in line_lower
-        ):
-            continue
-
-        # remove empty junk
-        if len(line.strip()) < 3:
-            continue
-
-        cleaned_lines.append(line)
-
-    return "\n".join(cleaned_lines)
