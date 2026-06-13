@@ -1,11 +1,13 @@
 import streamlit as st
 import feedparser
+import trafilatura
 import requests
 from bs4 import BeautifulSoup
-from readability import Document
 
 
-# ---------- Article extraction ----------
+# =========================
+# ARTICLE FETCHING (RSS)
+# =========================
 def get_articles_from_rss(rss_url, source_name, limit=5):
     feed = feedparser.parse(rss_url)
     articles = []
@@ -20,34 +22,55 @@ def get_articles_from_rss(rss_url, source_name, limit=5):
     return articles
 
 
+# =========================
+# TEXT EXTRACTION (ROBUST)
+# =========================
 def extract_clean_text(url):
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(url, headers=headers, timeout=10)
-    response.raise_for_status()
+    try:
+        # ---------- METHOD 1: Trafilatura (BEST) ----------
+        downloaded = trafilatura.fetch_url(url)
 
-    doc = Document(response.text)
-    html = doc.summary()
+        if downloaded:
+            text = trafilatura.extract(
+                downloaded,
+                include_comments=False,
+                include_tables=False
+            )
 
-    soup = BeautifulSoup(html, "html.parser")
-    text = soup.get_text(separator="\n")
+            if text and len(text.strip()) > 200:
+                return text
 
-    lines = [line.strip() for line in text.splitlines()]
-    cleaned = "\n".join(line for line in lines if line)
+        # ---------- METHOD 2: FALLBACK ----------
+        headers = {"User-Agent": "Mozilla/5.0"}
+        html = requests.get(url, headers=headers, timeout=15).text
 
-    return cleaned
+        soup = BeautifulSoup(html, "html.parser")
+        text = soup.get_text(separator="\n")
+
+        lines = [line.strip() for line in text.splitlines()]
+        cleaned = "\n".join(line for line in lines if line)
+
+        if len(cleaned) > 200:
+            return cleaned
+
+        return "⚠️ Could not extract readable article text."
+
+    except Exception as e:
+        return f"⚠️ Error extracting article:\n{str(e)}"
 
 
-# ---------- UI ----------
-st.title("📚 Multi-Source English News Reader")
+# =========================
+# STREAMLIT UI
+# =========================
+st.title("📚 Multi-Source English News Reader (Fixed)")
 
-st.sidebar.header("📰 News Sources")
+st.sidebar.header("📰 Sources")
 
-# Predefined sources (you can edit/add more)
 sources = {
     "NYTimes World": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
     "BBC World": "http://feeds.bbci.co.uk/news/world/rss.xml",
     "CNN Top Stories": "http://rss.cnn.com/rss/edition.rss",
-    "Inside Story": "https://insidestory.org.au/feed/"
+    "Reuters World": "https://www.reutersagency.com/feed/?best-topics=world"
 }
 
 selected_sources = []
@@ -59,18 +82,36 @@ for name in sources:
 limit = st.sidebar.slider("Articles per source", 1, 10, 5)
 
 
-# ---------- Load articles ----------
-if st.button("Fetch Articles"):
+# =========================
+# SESSION STATE (IMPORTANT FIX)
+# =========================
+if "selected_article" not in st.session_state:
+    st.session_state.selected_article = None
+
+
+# =========================
+# LOAD ARTICLES
+# =========================
+if st.button("📥 Fetch Articles"):
     all_articles = []
 
-    with st.spinner("Fetching from multiple sources..."):
+    with st.spinner("Fetching from sources..."):
         for name, url in selected_sources:
             articles = get_articles_from_rss(url, name, limit)
             all_articles.extend(articles)
 
+    st.session_state.all_articles = all_articles
     st.success(f"Loaded {len(all_articles)} articles")
 
-    # ---------- Filter by source ----------
+
+# =========================
+# DISPLAY ARTICLES
+# =========================
+if "all_articles" in st.session_state:
+
+    all_articles = st.session_state.all_articles
+
+    # Filter
     source_filter = st.selectbox(
         "Filter by source",
         ["All"] + list(set(a["source"] for a in all_articles))
@@ -79,27 +120,24 @@ if st.button("Fetch Articles"):
     if source_filter != "All":
         all_articles = [a for a in all_articles if a["source"] == source_filter]
 
-    # ---------- Display articles ----------
+    # Show list
     for i, article in enumerate(all_articles):
         st.markdown(f"### 🗞️ {article['title']}")
         st.caption(f"Source: {article['source']}")
 
-        if st.button(f"Read Article {i}", key=i):
-            with st.spinner("Extracting content..."):
+        if st.button(f"📖 Read Article {i}", key=f"btn_{i}"):
+            st.session_state.selected_article = article["link"]
+
+        # If selected → show content
+        if st.session_state.selected_article == article["link"]:
+            with st.spinner("Extracting article..."):
                 text = extract_clean_text(article["link"])
 
             st.text_area(
-                "Article Content",
-                text[:4000],
-                height=400,
-                key=f"text_{i}"
-            )
-
-            st.download_button(
-                "Download Article",
+                "📄 Article Content",
                 text,
-                file_name=article["title"][:40] + ".txt",
-                key=f"download_{i}"
+                height=500,
+                key=f"text_{i}"
             )
 
         st.divider()
