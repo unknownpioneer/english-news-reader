@@ -3,7 +3,4 @@ feedparser
 requests
 beautifulsoup4
 trafilatura
-lxml
-re
-lxml
-lxml_html_clean
+lxml[html-clean]
