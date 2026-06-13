@@ -73,6 +73,10 @@ sources = {
         "url": "https://www.theguardian.com/world/rss",
         "default": True
     },
+    "🇺🇸The NPR":{
+        "url": "https://feeds.npr.org/1001/rss.xml",
+        "default": True
+    },
     "🇦🇺Inside Story (Australia)": {
         "url": "https://insidestory.org.au/feed/",
         "default": True
