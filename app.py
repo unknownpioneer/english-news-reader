@@ -64,14 +64,33 @@ def clean_text(text):
 
 
 # =========================
+# TRANSLATION (EN → IT / ZH)
+# =========================
+def translate_word(word, lang="it"):
+    try:
+        langpair = {
+            "it": "en|it",
+            "zh": "en|zh",
+            "en": "it|en"
+        }.get(lang, "en|it")
+
+        url = f"https://api.mymemory.translated.net/get?q={word}&langpair={langpair}"
+        res = requests.get(url).json()
+
+        return res["responseData"]["translatedText"]
+
+    except:
+        return "Translation failed"
+
+
+# =========================
 # UI
 # =========================
-st.title("📚 English News Reader (Word Selection Mode)")
+st.title("📚 Multi-Source English Reader (BBC + Inside Story)")
 
 sources = {
-    "BBC": "http://feeds.bbci.co.uk/news/world/rss.xml",
-    "Inside Story": "https://insidestory.org.au/feed/",
-    "LinguaWire A1": "https://feeds.transistor.fm/learn-italian-a1-with-news-slow-easy-italiano-for-beginners"
+    "BBC News": "https://feeds.bbci.co.uk/news/rss.xml",
+    "Inside Story (Australia)": "https://insidestory.org.au/feed/"
 }
 
 selected_sources = []
@@ -150,36 +169,31 @@ if "articles" in st.session_state:
             )
 
             # =========================
-            # WORD SELECTION FEATURE
+            # WORD SELECTION + TRANSLATION
             # =========================
-            st.subheader("🖱️ Word Selection Mode")
+            st.subheader("🖱️ Word Translator")
 
-            st.write("Click inside the box below, then copy/paste or select a word.")
+            target_lang = st.selectbox(
+                "Translate to:",
+                ["Italian 🇮🇹", "Chinese 🇨🇳", "English ↔ Italian"]
+            )
 
-            selected = st.text_input("Enter or paste a word to analyze")
+            lang_map = {
+                "Italian 🇮🇹": "it",
+                "Chinese 🇨🇳": "zh",
+                "English ↔ Italian": "en"
+            }
 
-            if selected:
-                st.session_state.selected_word = selected.lower()
+            selected_word = st.text_input("Enter a word from the article")
 
-            # Show result
+            if selected_word:
+                st.session_state.selected_word = selected_word.lower()
+
             if st.session_state.selected_word:
                 word = st.session_state.selected_word
+                lang = lang_map[target_lang]
 
-                st.info(f"Selected word: **{word}**")
+                st.info(f"Word: {word}")
 
-                # simple explanation fallback
-                st.write("📘 Basic meaning (placeholder):")
-                st.write(f"'{word}' is a vocabulary word from the article.")
-
-                # optional: quick Google-style definition API (lightweight)
-                if st.button("🔎 Search definition"):
-                    try:
-                        res = requests.get(
-                            f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}"
-                        ).json()
-
-                        meaning = res[0]["meanings"][0]["definitions"][0]["definition"]
-                        st.success(meaning)
-
-                    except:
-                        st.warning("Definition not found.")
+                translation = translate_word(word, lang)
+                st.success(f"Translation: {translation}")
