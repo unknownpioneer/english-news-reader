@@ -5,3 +5,5 @@ beautifulsoup4
 trafilatura
 lxml
 re
+lxml
+lxml_html_clean
