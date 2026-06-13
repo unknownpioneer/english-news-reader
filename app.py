@@ -70,7 +70,8 @@ sources = {
     "NYTimes World": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
     "BBC World": "http://feeds.bbci.co.uk/news/world/rss.xml",
     "CNN Top Stories": "http://rss.cnn.com/rss/edition.rss",
-    "Reuters World": "https://www.reutersagency.com/feed/?best-topics=world"
+    "Reuters World": "https://www.reutersagency.com/feed/?best-topics=world",
+    "Inside Story": "https://insidestory.org.au/feed/"
 }
 
 selected_sources = []
