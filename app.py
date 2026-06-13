@@ -73,10 +73,6 @@ sources = {
         "url": "https://www.theguardian.com/world/rss",
         "default": True
     },
-    "🇺🇸AP": {
-        "url": "https://feeds.apnews.com/apf-topnews",
-        "default": True
-    },
     "🇦🇺Inside Story (Australia)": {
         "url": "https://insidestory.org.au/feed/",
         "default": True
