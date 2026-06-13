@@ -2,7 +2,6 @@ import streamlit as st
 import feedparser
 import trafilatura
 import requests
-import re
 from bs4 import BeautifulSoup
 
 
@@ -11,9 +10,6 @@ from bs4 import BeautifulSoup
 # =========================
 if "selected_article" not in st.session_state:
     st.session_state.selected_article = None
-
-if "selected_word" not in st.session_state:
-    st.session_state.selected_word = ""
 
 
 # =========================
@@ -56,6 +52,26 @@ def extract_clean_text(url):
 
 
 # =========================
+# TITLE + BODY SPLIT (NEW)
+# =========================
+def extract_title_and_body(text):
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+
+    junk_keywords = ["bbc", "share", "image", "listen", "watch", "subscribe"]
+
+    title = "Article"
+
+    for line in lines:
+        if not any(j in line.lower() for j in junk_keywords):
+            title = line
+            break
+
+    body = "\n".join(lines[1:]) if len(lines) > 1 else ""
+
+    return title, body
+
+
+# =========================
 # SIMPLE CLEANING
 # =========================
 def clean_text(text):
@@ -64,44 +80,38 @@ def clean_text(text):
 
 
 # =========================
-# TRANSLATION (EN → IT / ZH)
-# =========================
-def translate_word(word, lang="it"):
-    try:
-        langpair = {
-            "it": "en|it",
-            "zh": "en|zh",
-            "en": "it|en"
-        }.get(lang, "en|it")
-
-        url = f"https://api.mymemory.translated.net/get?q={word}&langpair={langpair}"
-        res = requests.get(url).json()
-
-        return res["responseData"]["translatedText"]
-
-    except:
-        return "Translation failed"
-
-
-# =========================
 # UI
 # =========================
-st.title("📚 Multi-Source English Reader (BBC + Inside Story)")
+st.title("📚 Multi-Source Reader")
 
 sources = {
-    "🇬🇧BBC News": "https://feeds.bbci.co.uk/news/rss.xml",
-    "🇦🇺Inside Story (Australia)": "https://insidestory.org.au/feed/",
-    "🇮🇹Republicca": "https://www.repubblica.it/rss/homepage/rss2.0.xml",
-    "🇬🇧The Guardian": "https://www.theguardian.com/world/rss",
+    "🇬🇧BBC News": {
+        "url": "https://feeds.bbci.co.uk/news/rss.xml",
+        "default": True
+    },
+    "🇬🇧The Guardian":
+    {
+        "url": "https://www.theguardian.com/world/rss"
+        "default": True
+    ),
+    "🇦🇺Inside Story (Australia)": {
+        "url": "https://insidestory.org.au/feed/",
+        "default": True   # 👈 IMPORTANT: unchecked by default
+    },
+    "🇮🇹Repubblica": {
+        "url": "https://www.repubblica.it/rss/homepage/rss2.0.xml"
+        "default": False
+    }
+    
 }
 
 selected_sources = []
 
 st.sidebar.header("📰 Sources")
 
-for name, url in sources.items():
-    if st.sidebar.checkbox(name, value=True):
-        selected_sources.append((name, url))
+for name, data in sources.items():
+    if st.sidebar.checkbox(name, value=data["default"]):
+        selected_sources.append((name, data["url"]))
 
 limit = st.sidebar.slider("Articles per source", 1, 10, 5)
 
@@ -135,6 +145,7 @@ if "articles" in st.session_state:
         articles = [a for a in articles if a["source"] == source_filter]
 
     for i, a in enumerate(articles):
+
         st.markdown(f"### 🗞️ {a['title']}")
         st.caption(a["source"])
 
@@ -149,53 +160,43 @@ if "articles" in st.session_state:
             raw_text = extract_clean_text(a["link"])
             text = clean_text(raw_text)
 
+            # ✨ NEW: title + body split
+            article_title, article_body = extract_title_and_body(text)
+
             st.subheader("📄 Article")
 
             font_size = st.slider("📖 Text size", 14, 26, 18, key=f"font_{i}")
 
+            # 📰 BIG TITLE
             st.markdown(
                 f"""
                 <div style="
-                    font-size:{font_size}px;
-                    line-height:1.8;
-                    padding:16px;
-                    background-color:#1e1e1e;
-                    border-radius:12px;
-                    color:#f5f5f5;
-                    white-space:pre-wrap;
+                    font-size:30px;
+                    font-weight:700;
+                    margin-bottom:12px;
+                    line-height:1.3;
+                    color:#ffffff;
                 ">
-                {text}
+                    {article_title}
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
-            # =========================
-            # WORD SELECTION + TRANSLATION
-            # =========================
-            st.subheader("🖱️ Word Translator")
-
-            target_lang = st.selectbox(
-                "Translate to:",
-                ["Italian 🇮🇹", "Chinese 🇨🇳", "English ↔ Italian"]
+            # 📖 BODY TEXT
+            st.markdown(
+                f"""
+                <div style="
+                    font-size:{font_size}px;
+                    line-height:1.8;
+                    padding:12px;
+                    background-color:#1e1e1e;
+                    border-radius:10px;
+                    color:#f5f5f5;
+                    white-space:pre-wrap;
+                ">
+                    {article_body}
+                </div>
+                """,
+                unsafe_allow_html=True
             )
-
-            lang_map = {
-                "Italian 🇮🇹": "it",
-                "Chinese 🇨🇳": "zh",
-                "English ↔ Italian": "en"
-            }
-
-            selected_word = st.text_input("Enter a word from the article")
-
-            if selected_word:
-                st.session_state.selected_word = selected_word.lower()
-
-            if st.session_state.selected_word:
-                word = st.session_state.selected_word
-                lang = lang_map[target_lang]
-
-                st.info(f"Word: {word}")
-
-                translation = translate_word(word, lang)
-                st.success(f"Translation: {translation}")
