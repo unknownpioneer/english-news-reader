@@ -3,12 +3,22 @@ import feedparser
 import trafilatura
 import requests
 import re
-import lxml
+from collections import Counter
 from bs4 import BeautifulSoup
 
 
 # =========================
-# ARTICLE FETCHING (RSS)
+# SESSION STATE INIT
+# =========================
+if "selected_article" not in st.session_state:
+    st.session_state.selected_article = None
+
+if "saved_words" not in st.session_state:
+    st.session_state.saved_words = set()
+
+
+# =========================
+# RSS FETCH
 # =========================
 def get_articles_from_rss(rss_url, source_name, limit=5):
     feed = feedparser.parse(rss_url)
@@ -23,148 +33,167 @@ def get_articles_from_rss(rss_url, source_name, limit=5):
 
     return articles
 
-def clean_article_text(text):
-    # split into lines
-    lines = text.split("\n")
 
-    cleaned_lines = []
-
-    for line in lines:
-        line_lower = line.lower()
-
-        # ❌ filter out metadata / noise
-        if (
-            "published" in line_lower or
-            "updated" in line_lower or
-            "ago" in line_lower or
-            "share" in line_lower or
-            "follow us" in line_lower or
-            "sign up" in line_lower
-        ):
-            continue
-
-        # remove empty junk
-        if len(line.strip()) < 3:
-            continue
-
-        cleaned_lines.append(line)
-
-    return "\n".join(cleaned_lines)
 # =========================
-# TEXT EXTRACTION (ROBUST)
+# ARTICLE EXTRACTION
 # =========================
 def extract_clean_text(url):
     try:
-        # ---------- METHOD 1: Trafilatura (BEST) ----------
         downloaded = trafilatura.fetch_url(url)
 
         if downloaded:
-            text = trafilatura.extract(
-                downloaded,
-                include_comments=False,
-                include_tables=False
-            )
-
-            if text and len(text.strip()) > 200:
+            text = trafilatura.extract(downloaded)
+            if text and len(text) > 200:
                 return text
 
-        # ---------- METHOD 2: FALLBACK ----------
+        # fallback
         headers = {"User-Agent": "Mozilla/5.0"}
         html = requests.get(url, headers=headers, timeout=15).text
-
         soup = BeautifulSoup(html, "html.parser")
-        text = soup.get_text(separator="\n")
 
-        lines = [line.strip() for line in text.splitlines()]
-        cleaned = "\n".join(line for line in lines if line)
-
-        if len(cleaned) > 200:
-            return cleaned
-
-        return "⚠️ Could not extract readable article text."
+        text = soup.get_text("\n")
+        return text
 
     except Exception as e:
-        return f"⚠️ Error extracting article:\n{str(e)}"
+        return f"⚠️ Error: {e}"
 
 
 # =========================
-# STREAMLIT UI
+# CLEAN TEXT
 # =========================
-st.title("📚 Multi-Source English News Reader (Fixed)")
+def clean_text(text):
+    lines = text.split("\n")
+    cleaned = []
 
-st.sidebar.header("📰 Sources")
+    for line in lines:
+        l = line.lower()
+
+        if any(x in l for x in ["published", "updated", "ago", "subscribe", "share"]):
+            continue
+
+        if len(line.strip()) < 3:
+            continue
+
+        cleaned.append(line)
+
+    return "\n".join(cleaned)
+
+
+# =========================
+# KEY VOCABULARY
+# =========================
+def extract_keywords(text, top_n=12):
+    words = re.findall(r"[a-zA-Z']+", text.lower())
+    words = [w for w in words if len(w) > 4]
+
+    freq = Counter(words)
+    return freq.most_common(top_n)
+
+
+# =========================
+# TRANSLATION
+# =========================
+def translate_word(word):
+    try:
+        url = f"https://api.mymemory.translated.net/get?q={word}&langpair=en|zh"
+        res = requests.get(url).json()
+        return res["responseData"]["translatedText"]
+    except:
+        return "Translation error"
+
+
+# =========================
+# QUIZ GENERATOR
+# =========================
+def generate_quiz(text, n=3):
+    sentences = [s.strip() for s in text.split(".") if len(s.split()) > 8]
+
+    if len(sentences) == 0:
+        return []
+
+    import random
+    picks = random.sample(sentences, min(n, len(sentences)))
+
+    return [
+        {
+            "question": f"What does this mean?\n\n{p}?",
+            "answer": p
+        }
+        for p in picks
+    ]
+
+
+# =========================
+# UI
+# =========================
+st.title("📚 English News Learning App")
 
 sources = {
-    "BBC World": "http://feeds.bbci.co.uk/news/world/rss.xml",
+    "BBC": "http://feeds.bbci.co.uk/news/world/rss.xml",
     "Inside Story": "https://insidestory.org.au/feed/"
 }
 
 selected_sources = []
 
-for name in sources:
+st.sidebar.header("📰 Sources")
+
+for name, url in sources.items():
     if st.sidebar.checkbox(name, value=True):
-        selected_sources.append((name, sources[name]))
+        selected_sources.append((name, url))
 
 limit = st.sidebar.slider("Articles per source", 1, 10, 5)
 
 
 # =========================
-# SESSION STATE (IMPORTANT FIX)
-# =========================
-if "selected_article" not in st.session_state:
-    st.session_state.selected_article = None
-
-
-# =========================
-# LOAD ARTICLES
+# FETCH ARTICLES
 # =========================
 if st.button("📥 Fetch Articles"):
     all_articles = []
 
-    with st.spinner("Fetching from sources..."):
-        for name, url in selected_sources:
-            articles = get_articles_from_rss(url, name, limit)
-            all_articles.extend(articles)
+    for name, url in selected_sources:
+        all_articles += get_articles_from_rss(url, name, limit)
 
-    st.session_state.all_articles = all_articles
+    st.session_state.articles = all_articles
     st.success(f"Loaded {len(all_articles)} articles")
 
 
 # =========================
 # DISPLAY ARTICLES
 # =========================
-if "all_articles" in st.session_state:
+if "articles" in st.session_state:
 
-    all_articles = st.session_state.all_articles
+    articles = st.session_state.articles
 
-    # Filter
     source_filter = st.selectbox(
         "Filter by source",
-        ["All"] + list(set(a["source"] for a in all_articles))
+        ["All"] + list(set(a["source"] for a in articles))
     )
 
     if source_filter != "All":
-        all_articles = [a for a in all_articles if a["source"] == source_filter]
+        articles = [a for a in articles if a["source"] == source_filter]
 
-    # Show list
-    for i, article in enumerate(all_articles):
-        st.markdown(f"### 🗞️ {article['title']}")
-        st.caption(f"Source: {article['source']}")
+    for i, a in enumerate(articles):
+        st.markdown(f"### 🗞️ {a['title']}")
+        st.caption(a["source"])
 
-        if st.button(f"📖 Read Article {i}", key=f"btn_{i}"):
-            st.session_state.selected_article = article["link"]
+        if st.button(f"📖 Read {i}", key=f"read_{i}"):
+            st.session_state.selected_article = a["link"]
 
-        # If selected → show content
-        if st.session_state.selected_article == article["link"]:
-           with st.spinner("Extracting article..."):
-                raw_text = extract_clean_text(article["link"])
-                text = clean_article_text(raw_text)
+        # =========================
+        # ARTICLE VIEW
+        # =========================
+        if st.session_state.selected_article == a["link"]:
 
-           font_size = st.slider("📖 Text size", 14, 26, 18, key=f"font_{i}")
+            raw = extract_clean_text(a["link"])
+            text = clean_text(raw)
 
-           st.markdown(
-               f"""
-               <div style="
+            st.subheader("📄 Article")
+
+            font_size = st.slider("Text size", 14, 26, 18, key=f"font_{i}")
+
+            st.markdown(
+                f"""
+                <div style="
                     font-size:{font_size}px;
                     line-height:1.8;
                     padding:16px;
@@ -172,10 +201,55 @@ if "all_articles" in st.session_state:
                     border-radius:12px;
                     color:#f5f5f5;
                     white-space:pre-wrap;
-              ">
-              {text}
-              </div>
-              """,
-              unsafe_allow_html=True
-          )
-            
+                ">
+                {text}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            # =========================
+            # KEY VOCABULARY
+            # =========================
+            st.subheader("🔑 Key Vocabulary")
+
+            keywords = extract_keywords(text)
+
+            for word, freq in keywords:
+                col1, col2 = st.columns([3, 1])
+
+                with col1:
+                    st.write(f"{word} ({freq})")
+
+                with col2:
+                    if st.button("➕ Save", key=f"save_{word}_{i}"):
+                        st.session_state.saved_words.add(word)
+
+            # =========================
+            # SAVED WORDS
+            # =========================
+            st.subheader("💾 Saved Words")
+            st.write(list(st.session_state.saved_words))
+
+            # =========================
+            # TRANSLATION
+            # =========================
+            st.subheader("🌍 Translate Words")
+
+            for word, _ in keywords:
+                if st.button(f"{word}", key=f"tr_{word}_{i}"):
+                    translation = translate_word(word)
+                    st.info(f"{word} → {translation}")
+
+            # =========================
+            # QUIZ
+            # =========================
+            st.subheader("🧠 Quiz")
+
+            quiz = generate_quiz(text)
+
+            for j, q in enumerate(quiz):
+                st.write(q["question"])
+
+                if st.button(f"Show answer {j}", key=f"quiz_{i}_{j}"):
+                    st.success(q["answer"])
