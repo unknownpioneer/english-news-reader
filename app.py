@@ -52,26 +52,6 @@ def extract_clean_text(url):
 
 
 # =========================
-# TITLE + BODY SPLIT (NEW)
-# =========================
-def extract_title_and_body(text):
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
-
-    junk_keywords = ["bbc", "share", "image", "listen", "watch", "subscribe"]
-
-    title = "Article"
-
-    for line in lines:
-        if not any(j in line.lower() for j in junk_keywords):
-            title = line
-            break
-
-    body = "\n".join(lines[1:]) if len(lines) > 1 else ""
-
-    return title, body
-
-
-# =========================
 # SIMPLE CLEANING
 # =========================
 def clean_text(text):
@@ -82,27 +62,29 @@ def clean_text(text):
 # =========================
 # UI
 # =========================
-st.title("📚 Multi-Source Reader")
+st.title("📚 Multi-Source English Reader")
 
 sources = {
     "🇬🇧BBC News": {
         "url": "https://feeds.bbci.co.uk/news/rss.xml",
         "default": True
     },
-    "🇬🇧The Guardian":
-    {
+    "🇬🇧The Guardian": {
         "url": "https://www.theguardian.com/world/rss",
+        "default": True
+    },
+    "🇺🇸AP": {
+        "url": "https://feeds.apnews.com/apf-topnews",
         "default": True
     },
     "🇦🇺Inside Story (Australia)": {
         "url": "https://insidestory.org.au/feed/",
-        "default": True   # 👈 IMPORTANT: unchecked by default
+        "default": True
     },
-    "🇮🇹Repubblica": {
+    "🇮🇹La Repubblica (Italy)": {
         "url": "https://www.repubblica.it/rss/homepage/rss2.0.xml",
-        "default": False
-    }
-    
+        "default": False   # 👈 disabled by default (as requested)
+    },
 }
 
 selected_sources = []
@@ -146,6 +128,7 @@ if "articles" in st.session_state:
 
     for i, a in enumerate(articles):
 
+        # ✅ REVERTED: use RSS title only
         st.markdown(f"### 🗞️ {a['title']}")
         st.caption(a["source"])
 
@@ -160,30 +143,10 @@ if "articles" in st.session_state:
             raw_text = extract_clean_text(a["link"])
             text = clean_text(raw_text)
 
-            # ✨ NEW: title + body split
-            article_title, article_body = extract_title_and_body(text)
-
             st.subheader("📄 Article")
 
             font_size = st.slider("📖 Text size", 14, 26, 18, key=f"font_{i}")
 
-            # 📰 BIG TITLE
-            st.markdown(
-                f"""
-                <div style="
-                    font-size:30px;
-                    font-weight:700;
-                    margin-bottom:12px;
-                    line-height:1.3;
-                    color:#ffffff;
-                ">
-                    {article_title}
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-            # 📖 BODY TEXT
             st.markdown(
                 f"""
                 <div style="
@@ -195,7 +158,7 @@ if "articles" in st.session_state:
                     color:#f5f5f5;
                     white-space:pre-wrap;
                 ">
-                    {article_body}
+                    {text}
                 </div>
                 """,
                 unsafe_allow_html=True
