@@ -62,7 +62,7 @@ def clean_text(text):
 # =========================
 # UI
 # =========================
-st.title("📚 Multi-Source English Reader")
+st.title("📚 Multi-Source Reader")
 
 sources = {
     "🇬🇧BBC News": {
@@ -73,16 +73,20 @@ sources = {
         "url": "https://www.theguardian.com/world/rss",
         "default": True
     },
-    "🔬The New Scientist": {
-        "url": "https://www.newscientist.com/?feed=rss",
-        "default": True
-    },
     "🇺🇸The National Public Radio":{
         "url": "https://feeds.npr.org/1001/rss.xml",
         "default": True
     },
+    "Newsletter": {
+        url: "https://www.newsweek.com/rss",
+        "default": True
+    },
     "🇦🇺Inside Story (Australia)": {
         "url": "https://insidestory.org.au/feed/",
+        "default": True
+    },
+    "🇨🇳The CGTN": {
+        "url": "https://www.cgtn.com/subscribe/rss.html",
         "default": True
     },
     "🇮🇹La Repubblica (Italy)": {
