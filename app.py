@@ -74,7 +74,7 @@ sources = {
         "default": True
     },
     "🔬The New Scientist": {
-        "url": "https://www.newscientist.com/?feed=rss2"
+        "url": "https://www.newscientist.com/?feed=rss2",
         "default": True
     },
     "🇺🇸The National Public Radio":{
