@@ -140,7 +140,7 @@ sources = {
         "url": "https://www.cgtn.com/subscribe/rss/section/politics.xml",
         "default": True
     },
-    "🇨🇳The CGTN (Politics)": {
+    "🇨🇳The CGTN (China)": {
         "url": "https://www.cgtn.com/subscribe/rss/section/china.xml",
         "default": False
     },
