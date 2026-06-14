@@ -128,6 +128,10 @@ sources = {
         "url": "https://www.newsweek.com/rss",
         "default": True
     },
+    "the CNBC": {
+        "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114",
+        "default": True
+    },
     "🇦🇺Inside Story (Australia)": {
         "url": "https://insidestory.org.au/feed/",
         "default": True
