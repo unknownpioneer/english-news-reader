@@ -55,8 +55,50 @@ def extract_clean_text(url):
 # SIMPLE CLEANING
 # =========================
 def clean_text(text):
+    blacklist = [
+        "by continuing to browse our site",
+        "privacy policy",
+        "terms of use",
+        "cookie settings",
+        "use of cookies",
+        "all rights reserved",
+        "copyright",
+        "subscribe",
+        "sign up",
+        "newsletter",
+        "advertisement",
+        "follow us",
+        "share this",
+        "related articles"
+    ]
+
     lines = text.split("\n")
-    return "\n".join([l for l in lines if len(l.strip()) > 2])
+    cleaned = []
+
+    for line in lines:
+        line = line.strip()
+
+        if len(line) < 3:
+            continue
+
+        line_lower = line.lower()
+
+        if any(phrase in line_lower for phrase in blacklist):
+            continue
+
+        cleaned.append(line)
+
+    text = "\n".join(cleaned)
+
+    # Additional regex cleaning
+    patterns = [
+        r"By continuing to browse.*?browser\.",
+    ]
+
+    for pattern in patterns:
+        text = re.sub(pattern, "", text, flags=re.IGNORECASE | re.DOTALL)
+
+    return text
 
 
 # =========================
