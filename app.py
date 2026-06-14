@@ -3,7 +3,7 @@ import feedparser
 import trafilatura
 import requests
 from bs4 import BeautifulSoup
-
+import re
 
 # =========================
 # SESSION STATE
