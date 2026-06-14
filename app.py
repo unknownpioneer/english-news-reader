@@ -66,7 +66,8 @@ def clean_text(text):
         "newsletter",
         "share this",
         "related articles",
-        "contributed to this story"
+        "contributed to this story",
+        "WATCH:"
     ]
 
     cleaned = []
