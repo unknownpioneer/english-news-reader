@@ -77,7 +77,7 @@ sources = {
         "url": "https://feeds.npr.org/1001/rss.xml",
         "default": True
     },
-    "Newsletter": {
+    "🇺🇸Newsletter": {
         "url": "https://www.newsweek.com/rss",
         "default": True
     },
@@ -85,9 +85,17 @@ sources = {
         "url": "https://insidestory.org.au/feed/",
         "default": True
     },
-    "🇨🇳The CGTN": {
-        "url": "https://www.cgtn.com/subscribe/rss.html",
+    "🇨🇳The CGTN (World)": {
+        "url": "https://www.cgtn.com/subscribe/rss/section/world.xml",
         "default": True
+    },
+    "🇨🇳The CGTN (Politics)": {
+        "url": "https://www.cgtn.com/subscribe/rss/section/politics.xml",
+        "default": True
+    },
+    "🇨🇳The CGTN (Politics)": {
+        "url": "https://www.cgtn.com/subscribe/rss/section/china.xml",
+        "default": False
     },
     "🇮🇹La Repubblica (Italy)": {
         "url": "https://www.repubblica.it/rss/homepage/rss2.0.xml",
