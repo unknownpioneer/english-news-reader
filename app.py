@@ -55,24 +55,19 @@ def extract_clean_text(url):
 # SIMPLE CLEANING
 # =========================
 def clean_text(text):
+    lines = text.split("\n")
+
     blacklist = [
-        "by continuing to browse our site",
         "privacy policy",
         "terms of use",
         "cookie settings",
         "use of cookies",
-        "all rights reserved",
-        "copyright",
         "subscribe",
-        "sign up",
         "newsletter",
-        "advertisement",
-        "follow us",
         "share this",
         "related articles"
     ]
 
-    lines = text.split("\n")
     cleaned = []
 
     for line in lines:
@@ -83,13 +78,23 @@ def clean_text(text):
 
         line_lower = line.lower()
 
-        if any(phrase in line_lower for phrase in blacklist):
+        if any(item in line_lower for item in blacklist):
+            continue
+
+        # Remove image captions
+        if re.search(
+            r"\.\s*/(xinhua|cgtn|reuters|ap|afp|vcg)\s*$",
+            line,
+            re.IGNORECASE
+        ):
+            continue
+
+        if line_lower.startswith(("photo:", "image:", "credit:")):
             continue
 
         cleaned.append(line)
 
-    text = "\n".join(cleaned)
-
+    return "\n".join(cleaned)
     # Additional regex cleaning
     patterns = [
         r"By continuing to browse.*?browser\.",
