@@ -78,7 +78,7 @@ sources = {
         "default": True
     },
     "Newsletter": {
-        url: "https://www.newsweek.com/rss",
+        "url": "https://www.newsweek.com/rss",
         "default": True
     },
     "🇦🇺Inside Story (Australia)": {
