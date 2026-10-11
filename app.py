@@ -1,11 +1,12 @@
 import streamlit as st
 import feedparser
-import trafilatura
 import requests
 from bs4 import BeautifulSoup
 import re
 import html
 import logging
+
+from news_reader_core import clean_text, extract_clean_text
 
 # =========================
 # SESSION STATE
@@ -52,102 +53,14 @@ def get_articles_from_rss(rss_url, source_name, limit=5):
 
         return articles
 
-    except Exception as exc:
+    except Exception:
         logging.exception("Failed to fetch RSS from %s", source_name)
         return []
 
 
-# =========================
-# ARTICLE EXTRACTION
-# =========================
 @st.cache_data(ttl=3600)
-def extract_clean_text(url):
-    try:
-        downloaded = trafilatura.fetch_url(url)
-
-        if downloaded:
-            text = trafilatura.extract(downloaded)
-            if text and len(text.strip()) > 200:
-                return text
-
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
-
-        content_type = response.headers.get("Content-Type", "")
-        if "text/html" not in content_type.lower() and "application/xhtml+xml" not in content_type.lower():
-            return None
-
-        response.encoding = response.apparent_encoding or "utf-8"
-        html_content = response.text
-        soup = BeautifulSoup(html_content, "html.parser")
-        text = soup.get_text("\n")
-
-        return text.strip() or None
-
-    except requests.RequestException as exc:
-        logging.warning("Request failed for article %s: %s", url, exc)
-        return None
-    except Exception as exc:
-        logging.exception("Unexpected error while extracting article %s", url)
-        return None
-
-
-# =========================
-# SIMPLE CLEANING
-# =========================
-def clean_text(text):
-    if not text:
-        return ""
-
-    text = re.sub(
-        r"By continuing to browse.*?browser\.",
-        "",
-        text,
-        flags=re.IGNORECASE | re.DOTALL
-    )
-
-    lines = text.split("\n")
-
-    blacklist = [
-        "privacy policy",
-        "terms of use",
-        "cookie settings",
-        "use of cookies",
-        "subscribe",
-        "newsletter",
-        "share this",
-        "related articles",
-        "contributed to this story",
-        "WATCH:"
-    ]
-
-    cleaned = []
-
-    for line in lines:
-        line = line.strip()
-
-        if len(line) < 3:
-            continue
-
-        line_lower = line.lower()
-
-        if any(item in line_lower for item in blacklist):
-            continue
-
-        if re.search(
-            r"\.\s*/(xinhua|cgtn|reuters|ap|afp|vcg)\s*$",
-            line,
-            re.IGNORECASE
-        ):
-            continue
-
-        if line_lower.startswith(("photo:", "image:", "credit:")):
-            continue
-
-        cleaned.append(line)
-
-    return "\n".join(cleaned).strip()
+def cached_extract_clean_text(url):
+    return extract_clean_text(url)
 
 
 # =========================
@@ -247,7 +160,7 @@ if "articles" in st.session_state:
             st.session_state.selected_article = a["link"]
 
         if st.session_state.selected_article == a["link"]:
-            raw_text = extract_clean_text(a["link"])
+            raw_text = cached_extract_clean_text(a["link"])
             text = clean_text(raw_text) if raw_text else ""
 
             st.subheader("📄 Article")
