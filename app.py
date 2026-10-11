@@ -3,6 +3,7 @@ import logging
 import re
 
 import feedparser
+import requests
 import streamlit as st
 
 from news_reader_core import clean_text, extract_clean_text
@@ -51,6 +52,27 @@ def get_article_preview(url):
         return "Preview unavailable for this story."
 
 
+@st.cache_data(ttl=3600)
+def get_entry_image_url(article_url):
+    try:
+        response = requests.get(article_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+        response.raise_for_status()
+        html_content = response.text
+
+        match = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
+        if match:
+            return match.group(1)
+
+        match = re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']', html_content, re.IGNORECASE)
+        if match:
+            return match.group(1)
+
+        return None
+    except Exception:
+        logging.exception("Failed to fetch og:image for %s", article_url)
+        return None
+
+
 def get_article_index(link, article_list):
     for idx, article in enumerate(article_list):
         if article["link"] == link:
@@ -64,6 +86,7 @@ def save_article(article):
         "title": article["title"],
         "source": article["source"],
         "link": article["link"],
+        "image_url": article.get("image_url"),
     }
     st.session_state.saved_articles = saved
 
@@ -72,6 +95,28 @@ def unsave_article(link):
     saved = st.session_state.saved_articles
     saved.pop(link, None)
     st.session_state.saved_articles = saved
+
+
+def extract_image_from_feed(entry):
+    media_content = getattr(entry, "media_content", []) or []
+    for item in media_content:
+        url = item.get("url") if isinstance(item, dict) else None
+        if url:
+            return url
+
+    media_thumbnail = getattr(entry, "media_thumbnail", []) or []
+    for item in media_thumbnail:
+        url = item.get("url") if isinstance(item, dict) else None
+        if url:
+            return url
+
+    enclosures = getattr(entry, "enclosures", []) or []
+    for item in enclosures:
+        url = item.get("href") if isinstance(item, dict) else None
+        if url and (item.get("type", "").startswith("image/") or url.lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".gif"))):
+            return url
+
+    return None
 
 
 # =========================
@@ -101,10 +146,12 @@ def get_articles_from_rss(rss_url, source_name, limit=5):
                 continue
 
             seen_links.add(normalized_link)
+            image_url = extract_image_from_feed(entry) or get_entry_image_url(link)
             articles.append({
                 "title": title,
                 "link": link,
                 "source": source_name,
+                "image_url": image_url,
             })
 
         return articles
@@ -134,7 +181,6 @@ sources = {
     "🇮🇹La Repubblica (Italy)": {"url": "https://www.repubblica.it/rss/homepage/rss2.0.xml", "default": False},
 }
 
-# Sidebar controls
 st.sidebar.header("📰 Sources")
 selected_sources = []
 for name, data in sources.items():
@@ -150,7 +196,6 @@ st.session_state.font_size = st.sidebar.slider("Font size", 14, 28, st.session_s
 st.session_state.line_spacing = st.sidebar.slider("Line spacing", 1.2, 2.2, st.session_state.line_spacing, step=0.1)
 limit = st.sidebar.slider("Articles per source", 1, 10, 5)
 
-# Updated saved list in sidebar
 if st.session_state.saved_articles:
     st.sidebar.markdown("---")
     st.sidebar.subheader("Saved")
@@ -196,13 +241,15 @@ if "articles" in st.session_state and st.session_state.articles:
             st.markdown(f"## 🗞️ {article['title']}")
             st.caption(f"{article['source']}")
 
+            if article.get("image_url"):
+                st.image(article["image_url"], use_container_width=True)
+
             col_a, col_b, col_c = st.columns([1, 1, 1])
             with col_a:
                 if st.button("← Previous", key="prev_article_reader") and current_index > 0:
                     st.session_state.selected_article = articles[current_index - 1]["link"]
             with col_b:
-                link_url = article["link"]
-                st.link_button("Open original", link_url)
+                st.link_button("Open original", article["link"])
             with col_c:
                 if st.button("Next →", key="next_article_reader") and current_index < len(articles) - 1:
                     st.session_state.selected_article = articles[current_index + 1]["link"]
@@ -252,6 +299,9 @@ if "articles" in st.session_state and st.session_state.articles:
             saved = a["link"] in st.session_state.saved_articles
 
             with st.container(border=True):
+                if a.get("image_url"):
+                    st.image(a["image_url"], use_container_width=True)
+
                 st.markdown(f"### 🗞️ {a['title']}")
                 st.caption(f"{a['source']}")
                 st.caption(f"{preview}")
