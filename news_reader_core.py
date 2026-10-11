@@ -12,6 +12,9 @@ UNNECESSARY_LINE_PATTERNS = [
     r"^follow us on.*$",
     r"^share this.*$",
     r"^read more.*$",
+    r"^by\s+[A-Z][A-Za-z'\-.]+(?:\s+[A-Z][A-Za-z'\-.]+)*$",
+    r"^by\s+[A-Z][A-Za-z'\-.]+(?:\s+[A-Z][A-Za-z'\-.]+)*,\s*.*$",
+    r"^\w+\s*\|\s*\w+\s*\|\s*.*$",
 ]
 
 
