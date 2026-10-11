@@ -4,6 +4,8 @@ import trafilatura
 import requests
 from bs4 import BeautifulSoup
 import re
+import html
+import logging
 
 # =========================
 # SESSION STATE
@@ -11,50 +13,100 @@ import re
 if "selected_article" not in st.session_state:
     st.session_state.selected_article = None
 
+if "articles" not in st.session_state:
+    st.session_state.articles = []
+
 
 # =========================
 # RSS FETCH
 # =========================
+@st.cache_data(ttl=900)
 def get_articles_from_rss(rss_url, source_name, limit=5):
-    feed = feedparser.parse(rss_url)
-    articles = []
+    try:
+        feed = feedparser.parse(rss_url)
 
-    for entry in feed.entries[:limit]:
-        articles.append({
-            "title": entry.title,
-            "link": entry.link,
-            "source": source_name
-        })
+        if getattr(feed, "bozo", False) and getattr(feed, "bozo_exception", None):
+            logging.warning("RSS parse warning for %s: %s", source_name, feed.bozo_exception)
 
-    return articles
+        entries = getattr(feed, "entries", []) or []
+        articles = []
+        seen_links = set()
+
+        for entry in entries[:limit]:
+            title = str(getattr(entry, "title", "") or "").strip()
+            link = str(getattr(entry, "link", "") or "").strip()
+
+            if not title or not link:
+                continue
+
+            normalized_link = link.lower()
+            if normalized_link in seen_links:
+                continue
+
+            seen_links.add(normalized_link)
+            articles.append({
+                "title": title,
+                "link": link,
+                "source": source_name
+            })
+
+        return articles
+
+    except Exception as exc:
+        logging.exception("Failed to fetch RSS from %s", source_name)
+        return []
 
 
 # =========================
 # ARTICLE EXTRACTION
 # =========================
+@st.cache_data(ttl=3600)
 def extract_clean_text(url):
     try:
         downloaded = trafilatura.fetch_url(url)
 
         if downloaded:
             text = trafilatura.extract(downloaded)
-            if text and len(text) > 200:
+            if text and len(text.strip()) > 200:
                 return text
 
         headers = {"User-Agent": "Mozilla/5.0"}
-        html = requests.get(url, headers=headers, timeout=15).text
-        soup = BeautifulSoup(html, "html.parser")
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status()
 
-        return soup.get_text("\n")
+        content_type = response.headers.get("Content-Type", "")
+        if "text/html" not in content_type.lower() and "application/xhtml+xml" not in content_type.lower():
+            return None
 
-    except Exception as e:
-        return f"⚠️ Error: {e}"
+        response.encoding = response.apparent_encoding or "utf-8"
+        html_content = response.text
+        soup = BeautifulSoup(html_content, "html.parser")
+        text = soup.get_text("\n")
+
+        return text.strip() or None
+
+    except requests.RequestException as exc:
+        logging.warning("Request failed for article %s: %s", url, exc)
+        return None
+    except Exception as exc:
+        logging.exception("Unexpected error while extracting article %s", url)
+        return None
 
 
 # =========================
 # SIMPLE CLEANING
 # =========================
 def clean_text(text):
+    if not text:
+        return ""
+
+    text = re.sub(
+        r"By continuing to browse.*?browser\.",
+        "",
+        text,
+        flags=re.IGNORECASE | re.DOTALL
+    )
+
     lines = text.split("\n")
 
     blacklist = [
@@ -83,7 +135,6 @@ def clean_text(text):
         if any(item in line_lower for item in blacklist):
             continue
 
-        # Remove image captions
         if re.search(
             r"\.\s*/(xinhua|cgtn|reuters|ap|afp|vcg)\s*$",
             line,
@@ -96,16 +147,7 @@ def clean_text(text):
 
         cleaned.append(line)
 
-    return "\n".join(cleaned)
-    # Additional regex cleaning
-    patterns = [
-        r"By continuing to browse.*?browser\.",
-    ]
-
-    for pattern in patterns:
-        text = re.sub(pattern, "", text, flags=re.IGNORECASE | re.DOTALL)
-
-    return text
+    return "\n".join(cleaned).strip()
 
 
 # =========================
@@ -122,7 +164,7 @@ sources = {
         "url": "https://www.theguardian.com/world/rss",
         "default": True
     },
-    "🇺🇸The National Public Radio":{
+    "🇺🇸The National Public Radio": {
         "url": "https://feeds.npr.org/1001/rss.xml",
         "default": True
     },
@@ -152,7 +194,7 @@ sources = {
     },
     "🇮🇹La Repubblica (Italy)": {
         "url": "https://www.repubblica.it/rss/homepage/rss2.0.xml",
-        "default": False   # 👈 disabled by default (as requested)
+        "default": False
     },
 }
 
@@ -161,7 +203,7 @@ selected_sources = []
 st.sidebar.header("📰 Sources")
 
 for name, data in sources.items():
-    if st.sidebar.checkbox(name, value=data["default"]):
+    if st.sidebar.checkbox(name, value=data["default"], key=f"source_{name}"):
         selected_sources.append((name, data["url"]))
 
 limit = st.sidebar.slider("Articles per source", 1, 10, 5)
@@ -174,9 +216,10 @@ if st.button("📥 Fetch Articles"):
     all_articles = []
 
     for name, url in selected_sources:
-        all_articles += get_articles_from_rss(url, name, limit)
+        all_articles.extend(get_articles_from_rss(url, name, limit))
 
     st.session_state.articles = all_articles
+    st.session_state.selected_article = None
     st.success(f"Loaded {len(all_articles)} articles")
 
 
@@ -184,51 +227,49 @@ if st.button("📥 Fetch Articles"):
 # DISPLAY ARTICLES
 # =========================
 if "articles" in st.session_state:
-
     articles = st.session_state.articles
 
     source_filter = st.selectbox(
         "Filter by source",
-        ["All"] + list(set(a["source"] for a in articles))
+        ["All"] + sorted({a["source"] for a in articles})
     )
 
     if source_filter != "All":
         articles = [a for a in articles if a["source"] == source_filter]
 
     for i, a in enumerate(articles):
+        article_id = re.sub(r"[^A-Za-z0-9_]", "_", a["link"])
 
-        # ✅ REVERTED: use RSS title only
         st.markdown(f"### 🗞️ {a['title']}")
         st.caption(a["source"])
 
-        if st.button(f"📖 Read {i}", key=f"read_{i}"):
+        if st.button(f"📖 Read {i}", key=f"read_{article_id}"):
             st.session_state.selected_article = a["link"]
 
-        # =========================
-        # ARTICLE VIEW
-        # =========================
         if st.session_state.selected_article == a["link"]:
-
             raw_text = extract_clean_text(a["link"])
-            text = clean_text(raw_text)
+            text = clean_text(raw_text) if raw_text else ""
 
             st.subheader("📄 Article")
 
-            font_size = st.slider("📖 Text size", 14, 26, 18, key=f"font_{i}")
-
-            st.markdown(
-                f"""
-                <div style="
-                    font-size:{font_size}px;
-                    line-height:1.8;
-                    padding:12px;
-                    background-color:#1e1e1e;
-                    border-radius:10px;
-                    color:#f5f5f5;
-                    white-space:pre-wrap;
-                ">
-                    {text}
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+            if not text:
+                st.info("No readable article text could be extracted for this article.")
+            else:
+                font_size = st.slider("📖 Text size", 14, 26, 18, key=f"font_{article_id}")
+                escaped_text = html.escape(text)
+                st.markdown(
+                    f"""
+                    <div style=
+                        "font-size:{font_size}px;
+                        line-height:1.8;
+                        padding:12px;
+                        background-color:#1e1e1e;
+                        border-radius:10px;
+                        color:#f5f5f5;
+                        white-space:pre-wrap;"
+                    >
+                        {escaped_text}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
