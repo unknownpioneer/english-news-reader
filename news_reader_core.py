@@ -1,5 +1,19 @@
 import re
 
+UNNECESSARY_LINE_PATTERNS = [
+    r"^published(?:\s+on|\s+at)?\s+.*$",
+    r"^updated(?:\s+on|\s+at)?\s+.*$",
+    r"^last updated(?:\s+on|\s+at)?\s+.*$",
+    r"^posted\s+.*$",
+    r"^\d+\s*(?:min|mins|minute|minutes)\s+read$",
+    r"^reading time\s*:\s*.*$",
+    r"^estimated reading time\s*:\s*.*$",
+    r"^listen to this article.*$",
+    r"^follow us on.*$",
+    r"^share this.*$",
+    r"^read more.*$",
+]
+
 
 def clean_text(text):
     if not text:
@@ -33,7 +47,11 @@ def clean_text(text):
             continue
 
         line_lower = line.lower()
+
         if any(item in line_lower for item in blacklist):
+            continue
+
+        if any(re.match(pattern, line, flags=re.IGNORECASE) for pattern in UNNECESSARY_LINE_PATTERNS):
             continue
 
         if re.search(r"\.\s*/(xinhua|cgtn|reuters|ap|afp|vcg)\s*$", line, re.IGNORECASE):
